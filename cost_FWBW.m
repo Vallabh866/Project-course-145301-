@@ -1,4 +1,4 @@
-function cost = cost_FWBW(CL_s1, CL_s2, CL_k1, CL_k2, v_ini_clothoid)
+function [cost, v_ini_clothoid] = cost_FWBW(CL_s, CL_k, v_ini_clothoid)
 
 set(0,'DefaultFigureWindowStyle','docked');
 set(0,'defaultAxesFontSize',20)
@@ -28,22 +28,22 @@ dataFB.c0     = c0;
 dataFB.c1     = c1;  
 
 % curvilinear abscissa values defining the extrema of each clothoid in a list of clothoids
-s_list = [0,55.7216,95.9378,136.1294,176.5633,216.7047];  % [m]
+%s_list = [0,55.7216,95.9378,136.1294,176.5633,216.7047];  % [m]
 %s_list = [0,55.7216];
-%s_list = [CL_s1, CL_s2]; % [m]
+s_list = [0, CL_s]; % [m]
 %fprintf("Clothoids : %d\n", s_list);
 %fprintf("------------------------------\n\n");
 
 % curvature values defining the extrema of each clothoid in a list of clothoids
-curv_list = [0.0105,-0.0084,0.0104,-0.0180,-0.0073,0.0034];  % [m^-1]
+%curv_list = [0.0105,-0.0084,0.0104,-0.0180,-0.0073,0.0034];  % [m^-1]
 %curv_list = [0.0105,-0.0084];
-%curv_list = [CL_k1, CL_k2]; % [m^-1]
+curv_list = [CL_k, CL_k]; % [m^-1]
 
 % initial speed of the vehicle
 %v_ini_clothoid = 2.3614;  % [m/s]
 
 % final speed of the vehicle (at the end of the path)
-v_fin = sqrt(Ay_max/CL_k1);  % [m/s]
+v_fin = sqrt(Ay_max/CL_k);  % [m/s]
 
 FB = ForwardBackwardList(dataFB);
 FB.maxSpeed(v_ini_clothoid,v_fin,s_list,curv_list);
@@ -51,8 +51,6 @@ final_time = FB.totalT();  % minimum travelling time (optimal)
 
 cost = final_time;
 %fprintf("cost: %f\n",cost);
-
-v_ini_clothoid = v_fin;
 
 % % Plot the speed profile
 % figure(1)
@@ -76,6 +74,9 @@ time_sampling = 0.01;  % [s]
 tim_vect = 0:time_sampling:final_time;
 curv_absc_vect = FB.s(tim_vect);        % [m] curvilinear abscissa of the solution
 speed_profile = FB.vs(curv_absc_vect);  % [m/s] speed profile of the solution
+
+v_ini_clothoid = speed_profile(end);
+fprintf("Initial velocity inside function: %f\n",v_ini_clothoid);
 
 % figure(3)
 % plot(tim_vect,speed_profile,'.')

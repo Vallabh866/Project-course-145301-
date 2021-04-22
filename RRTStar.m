@@ -5,7 +5,7 @@ x_max = 200;
 y_max = 160;
 xy = [65 92; 70 85; 75 75; 85 100; 87 90; 90 80; 110 100; 107 90; 105 80; 120 95; 120 75];
 
-%Define road edges as obstacles
+%Define road edges
 obstacle = [50,15,20,20];
 circr = @(radius,rad_ang)  [radius*cos(rad_ang);  radius*sin(rad_ang)];         % Circle Function For Angles In Radians
 %circd = @(radius,deg_ang)  [radius*cosd(deg_ang);  radius*sind(deg_ang)];       % Circle Function For Angles In Degrees
@@ -50,12 +50,12 @@ if(rad2deg(atan(slope_q_start))>0)
         instant_theta_q_start = -(pi/2 - atan(slope_q_start));
     else
         instant_theta_q_start = pi/2 + atan(slope_q_start);
-    end
+end
 CL = ClothoidCurve(q_start.coord(1), q_start.coord(2), instant_theta_q_start, 1/((radius1+radius2)/2), 0, 1 );
 npts = 100;
 v_ini_clothoid = 2.3614;  % [m/s]
-CL_s = zeros(numNodes);
-CL_k = zeros(numNodes);
+%CL_s = zeros(numNodes);
+%CL_k = zeros(numNodes);
 
 for i = 1:1:numNodes
     q_rand = xy(((round(rand*10)/10)*10) + 1, :);
@@ -106,21 +106,23 @@ for i = 1:1:numNodes
     
     %fprintf("Length: %f\n",CL.length);
     
-    CL_s(i) = CL.length;
-    CL_k(i) = 1/((radius1+radius2)/2);
+    CL_s = CL.length;
+    CL_k = 1/((radius1+radius2)/2);
     %fprintf("Clothoids : %d\n", CL_s);
     %fprintf("------------------------------\n\n");
     
-    if(i>=2)
-        cost = cost_FWBW(CL_s(i), CL_s(i-1), 1/((radius1+radius2)/2), 1/((radius1+radius2)/2),v_ini_clothoid);
-    end
+    %if(i>=2)
+        [cost, v_ini_clothoid] = cost_FWBW(CL_s, CL_k,v_ini_clothoid);
     
-    %fprintf("cost: %f\n",cost);
-    %fprintf("Initial velocity: %f\n",v_ini_clothoid);
+    
+    %fprintf("cost : %f\n", cost);
+    %fprintf("Initial velocity outside function: %f\n",v_ini_clothoid);
     %fprintf("------------------------------\n\n");
+    %end
     
-    q_new.cost = dist(q_new.coord, q_near.coord) + q_near.cost;
-        
+    %q_new.cost = dist(q_new.coord, q_near.coord) + q_near.cost;
+    q_new.cost = cost;
+    
     % Within a radius of r, find all existing nodes
     q_nearest = [];
     r = 10;
@@ -144,7 +146,7 @@ for i = 1:1:numNodes
         if dist(q_nearest(k).coord, q_new.coord) < C_min
             q_min = q_nearest(k);
             C_min = q_nearest(k).cost + dist(q_nearest(k).coord, q_new.coord);
-            end
+        end
     end
         
     % Update parent to least cost-from node
@@ -185,16 +187,16 @@ while q_end.parent ~= 0
     q_end = nodes(start);
 end
 
-for k = 1:1:length(final_nodes)
-    slope = (final_nodes(k,2))/(final_nodes(k,1)-100);
-    %fprintf("Slope: %d\n", slope);
-    if(rad2deg(atan(slope))>0)
-        instantaneous_theta(k) = -(pi/2 - atan(slope));
-    else
-        instantaneous_theta(k) = pi/2 + atan(slope);
-    end
-    %final_nodes = [final_nodes instantaneous_theta];
-end
+% for k = 1:1:length(final_nodes)
+%     slope = (final_nodes(k,2))/(final_nodes(k,1)-100);
+%     %fprintf("Slope: %d\n", slope);
+%     if(rad2deg(atan(slope))>0)
+%         instantaneous_theta(k) = -(pi/2 - atan(slope));
+%     else
+%         instantaneous_theta(k) = pi/2 + atan(slope);
+%     end
+%     %final_nodes = [final_nodes instantaneous_theta];
+% end
 % 
 % dist = 0;
 % for k = 1:1:length(final_nodes)-1 
