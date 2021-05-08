@@ -1,65 +1,64 @@
 clearvars
 close all
+clc
 
-x_max = 200;
-y_max = 160;
-xy = [65 92; 70 85; 75 75; 85 100; 87 90; 90 80; 110 100; 107 90; 105 80; 120 95; 120 75];
+% Create track and retrieve clothoid list of the track
+Center_line = ClothoidList;
+Center_line = create_RoadFile();
 
-%Define road edges
-obstacle = [50,15,20,20];
-circr = @(radius,rad_ang)  [radius*cos(rad_ang);  radius*sin(rad_ang)];         % Circle Function For Angles In Radians
-%circd = @(radius,deg_ang)  [radius*cosd(deg_ang);  radius*sind(deg_ang)];       % Circle Function For Angles In Degrees
-N = 250;                                                         % Number Of Points In Complete Circle
-%r_angl = linspace(pi/4, 3*pi/4, N);                             % Angle Defining Arc Segment (radians)
-r_angl = linspace(0, pi, N);                             % Angle Defining Arc Segment (radians)
-radius1 = 105;                                                   % Arc Radius
-center1 = [100 105];
-close all;
-clc;
+% CL2 = ClothoidCurve();
+% CL2.build( -25, 100, 38, 0.000001, -0.00004, 420 );
+% CL2.plot();
+% Center_line = CL2;
 
-radius2 = 75;
-center2 = [100 75];
-xy_r1 = circr(radius1,r_angl);                                    % Matrix (2xN) Of (x,y) Coordinates
-xy_r2 = circr(radius2,r_angl);
-xy_r1 = transpose(xy_r1);
-xy_r2 = transpose(xy_r2);
-plot(xy_r1(:,1)+100, xy_r1(:,2), 'b')
-grid on
-hold on
+% return the parameters defining the clothoid curve
+%[x_Center_line,y_Center_line,theta_Center_line,k_Center_line,dk_Center_line,L_Center_line] = Center_line.getPars();
 
-plot(xy_r2(:,1)+100, xy_r2(:,2), 'b')
-hold on
+%Function to define way point positions based on given road edges
+[waypoints, headings, curvatures] = define_waypoints(Center_line);
+[waypoints_per_wayline,waylines_count] = size(waypoints);
+fprintf('%d %d\n',waypoints_per_wayline ,waylines_count);
+for k = 1:waylines_count
+  for m = 1:waypoints_per_wayline
+    plot(waypoints{m,k}{1}(1), waypoints{m,k}{1}(2), 'x');
+  end
+end
 
-
-EPS = 45;
-numNodes = 100;        
-
-q_start.coord = [65 82];
+EPS = 10;
+q_start.coord = [waypoints{2,1}{1}(1), waypoints{2,1}{1}(2)];
 q_start.cost = 0;
 q_start.parent = 0;
-q_goal.coord = [120 75];
+%q_goal.coord = [120 75];
+q_goal.coord = [waypoints{2,ceil(0.3*waylines_count)}{1}(1), waypoints{2,ceil(0.3*waylines_count)}{1}(2)];
 q_goal.cost = 0;
 
 nodes(1) = q_start;
-%figure(1)
-%axis([0 x_max 0 y_max])
-%rectangle('Position',obstacle,'FaceColor',[0 .5 .5])
-%hold on
-slope_q_start = (q_start.coord(2))/(q_start.coord(1)-100);
-if(rad2deg(atan(slope_q_start))>0)
-        instant_theta_q_start = -(pi/2 - atan(slope_q_start));
-    else
-        instant_theta_q_start = pi/2 + atan(slope_q_start);
-end
-CL = ClothoidCurve(q_start.coord(1), q_start.coord(2), instant_theta_q_start, 1/((radius1+radius2)/2), 0, 1 );
+CL = ClothoidCurve(q_start.coord(1), q_start.coord(2), Center_line.theta(0), Center_line.kappa(0), 0, 1 );
 npts = 100;
 v_ini_clothoid = 2.3614;  % [m/s]
-%CL_s = zeros(numNodes);
-%CL_k = zeros(numNodes);
 
-for i = 1:1:numNodes
-    q_rand = xy(((round(rand*10)/10)*10) + 1, :);
-    plot(q_rand(1), q_rand(2), 'x', 'Color',  [0 0.4470 0.7410])
+%Road edges
+% CL2 = ClothoidCurve();
+% CL2.build( -25, 100, 38, 0.000001, -0.00004, 420 );
+% CL2.plot();
+% CL3 = ClothoidCurve();
+% CL3.build( -25, 70, 38, 0.000001, -0.00007, 300 );
+% CL3.plot();
+%
+
+% return the parameters defining the clothoid curve
+% [x_CL2,y_CL2,theta_CL2,k_CL2,dk_CL2,L_CL2] = CL2.getPars();
+% [x_CL3,y_CL3,theta_CL3,k_CL3,dk_CL3,L_CL3] = CL3.getPars();
+
+for i = 1:1:(waypoints_per_wayline*waylines_count)
+%for i = 1:1:500
+    rand_waypoint = min(max(floor(rand*10/3),1),3);
+    rand_wayline = min(max(floor(rand*2000),1),waylines_count);
+    
+    q_rand = [waypoints{rand_waypoint,rand_wayline}{1}(1), waypoints{rand_waypoint,rand_wayline}{1}(2)];
+    
+    %q_rand = xy(((round(rand*10)/10)*10) + 1, :);
+    plot(q_rand(1), q_rand(2), 'x', 'Color',  [0 0.4470 0.7410]);
     
     % Break if goal node is already reached
     for j = 1:1:length(nodes)
@@ -79,48 +78,41 @@ for i = 1:1:numNodes
     [val, idx] = min(ndist);
     q_near = nodes(idx);
     
-    q_new.coord = steer(q_rand, q_near.coord, val, EPS);
+    if val >= EPS
+       q_new = q_near;
+    else
+       q_new.coord(1) = q_rand(1);
+       q_new.coord(2) = q_rand(2);
+    end
+    
     line([q_near.coord(1), q_new.coord(1)], [q_near.coord(2), q_new.coord(2)], 'Color', 'k', 'LineWidth', 2);
     drawnow
     hold on
     
-    slope_q_near = (q_near.coord(2))/(q_near.coord(1)-100);
-    slope_q_new = (q_new.coord(2))/(q_new.coord(1)-100);
-    
-    if(rad2deg(atan(slope_q_near))>0)
-        instant_theta_q_near = -(pi/2 - atan(slope_q_near));
-    else
-        instant_theta_q_near = pi/2 + atan(slope_q_near);
-    end
-    
-    if(rad2deg(atan(slope_q_new))>0)
-        instant_theta_q_new = -(pi/2 - atan(slope_q_new));
-    else
-        instant_theta_q_new = pi/2 + atan(slope_q_new);
+    for k = 1:waylines_count
+        for m = 1:waypoints_per_wayline
+            %plot(waypoints{m,k}{1}(1), waypoints{m,k}{1}(2), 'x');
+            if ((q_near.coord(1) == waypoints{m,k}{1}(1)) && (q_near.coord(2) == waypoints{m,k}{1}(2)))
+                q_near_theta = headings(1,k);
+                q_near_kappa = curvatures(1,k);
+            end
+            if ((q_new.coord(1) == waypoints{m,k}{1}(1)) && (q_new.coord(2) == waypoints{m,k}{1}(2)))
+                q_new_theta = headings(1,k);
+                q_new_kappa = curvatures(1,k);
+            end
+        end
     end
     
     if(q_new.coord(1)>q_near.coord(1))
-        CL.build_G1(q_near.coord(1), q_near.coord(2), instant_theta_q_near, q_new.coord(1), q_new.coord(2), instant_theta_q_new);
+        CL.build_G1(q_near.coord(1), q_near.coord(2), q_near_theta, q_new.coord(1), q_new.coord(2), q_new_theta);
         CL.plot(npts,'Color','red');
     end
     
-    %fprintf("Length: %f\n",CL.length);
-    
     CL_s = CL.length;
-    CL_k = 1/((radius1+radius2)/2);
-    %fprintf("Clothoids : %d\n", CL_s);
-    %fprintf("------------------------------\n\n");
+    CL_k = q_new_kappa;
     
-    %if(i>=2)
-        [cost, v_ini_clothoid] = cost_FWBW(CL_s, CL_k,v_ini_clothoid);
-    
-    
-    %fprintf("cost : %f\n", cost);
-    %fprintf("Initial velocity outside function: %f\n",v_ini_clothoid);
-    %fprintf("------------------------------\n\n");
-    %end
-    
-    %q_new.cost = dist(q_new.coord, q_near.coord) + q_near.cost;
+    [cost, v_ini_clothoid] = cost_FWBW(CL_s, CL_k,v_ini_clothoid);
+        
     q_new.cost = cost;
     
     % Within a radius of r, find all existing nodes
@@ -186,59 +178,3 @@ while q_end.parent ~= 0
     
     q_end = nodes(start);
 end
-
-% for k = 1:1:length(final_nodes)
-%     slope = (final_nodes(k,2))/(final_nodes(k,1)-100);
-%     %fprintf("Slope: %d\n", slope);
-%     if(rad2deg(atan(slope))>0)
-%         instantaneous_theta(k) = -(pi/2 - atan(slope));
-%     else
-%         instantaneous_theta(k) = pi/2 + atan(slope);
-%     end
-%     %final_nodes = [final_nodes instantaneous_theta];
-% end
-% 
-% dist = 0;
-% for k = 1:1:length(final_nodes)-1 
-%     dist1 = sqrt((final_nodes(k,2)-final_nodes(k+1,2))*(final_nodes(k,2)-final_nodes(k+1,2))+(final_nodes(k,1)-final_nodes(k+1,1))*(final_nodes(k,1)-final_nodes(k+1,1)));
-%     dist = dist + dist1;
-%     %fprintf("%d\n", dist);
-% end
-% 
-% 
-% 
-% instantaneous_theta = instantaneous_theta';
-% interp_sampling = 30;
-% interp_vector_fewPoints = 0:interp_sampling:dist;
-% refPath_poses_fewPoints = [final_nodes instantaneous_theta];
-% 
-% % ----------------------
-% % Fit the interpolated path with clothoids
-% % ----------------------
-% path_fewPoints = ClothoidList();
-% numOfClothoids_fewPoints = size(refPath_poses_fewPoints,1);
-% for jj = 1:numOfClothoids_fewPoints-1
-%     path_fewPoints.push_back_G1(refPath_poses_fewPoints(jj,1),refPath_poses_fewPoints(jj,2),deg2rad(refPath_poses_fewPoints(jj,3)), refPath_poses_fewPoints(jj+1,1),refPath_poses_fewPoints(jj+1,2),deg2rad(refPath_poses_fewPoints(jj+1,3))); 
-%     %fprintf("%d, %d, %d \n",refPath_poses_fewPoints(jj+1,1),refPath_poses_fewPoints(jj+1,2),refPath_poses_fewPoints(jj+1,3));
-% end
-% 
-% % Compute the local curvature for the reference route
-% interp_vector_fewPoints = [interp_vector_fewPoints, path_fewPoints.length];    % add also the final route point
-% [x_cloth_refPath_fewPoints,y_cloth_refPath_fewPoints,theta_cloth_refPath_fewPoints,curv_refPath_fewPoints] = path_fewPoints.evaluate(interp_vector_fewPoints);
-% refRoute_fewPoints = [x_cloth_refPath_fewPoints',y_cloth_refPath_fewPoints',theta_cloth_refPath_fewPoints',curv_refPath_fewPoints'];
-% 
-% %scenario = load('./Scenario/scenario');
-% save('scenario.mat','refRoute_fewPoints');
-% plot(refRoute_fewPoints(:,1),refRoute_fewPoints(:,2),'go','MarkerFaceColor','g','MarkerSize',4)
-% scatter(refPath_poses_fewPoints(:,1),refPath_poses_fewPoints(:,2),'DisplayName','Interpolated Points')
-
-%CL = ClothoidCurve(q_start.coord(1), q_start.coord(2), instantaneous_theta(1), 1/((radius1+radius2)/2), 0, 0.5 );
-%CL.build_G1(refPath_poses_fewPoints(1,1), refPath_poses_fewPoints(1,2), refPath_poses_fewPoints(1,3), refPath_poses_fewPoints(2,1), refPath_poses_fewPoints(2,2), refPath_poses_fewPoints(2,3));
-
-%npts = 100;
-%CL.plot(npts,'Color','red');
-
-% for jj = 2:size(refPath_poses_fewPoints,1)
-%    CL.build_G1(refPath_poses_fewPoints(jj,1), refPath_poses_fewPoints(jj,2), refPath_poses_fewPoints(jj,3), refPath_poses_fewPoints(jj-1,1), refPath_poses_fewPoints(jj-1,2), refPath_poses_fewPoints(jj-1,3));
-%    CL.plot(npts,'Color','red');
-% end
