@@ -2,9 +2,9 @@ clearvars
 close all
 clc
 
-addpath(genpath('E:\Project-course-145301-'));
-addpath('E:\Project-course-145301-\Project-course-145301-\Racetracks\Racetracks\PistaAzzurra_Track');
-run('E:\Project-course-145301-\Project-course-145301-\Racetracks\Racetracks\PistaAzzurra_Track\create_RoadFile.m');
+addpath(genpath('C:\Project-course-145301--main\Project-course-145301--main'));
+addpath('C:\Project-course-145301--main\Project-course-145301--main\Racetracks\Racetracks\PistaAzzurra_Track');
+run('C:\Project-course-145301--main\Project-course-145301--main\Racetracks\Racetracks\PistaAzzurra_Track\create_RoadFile.m');
 
 close all
 
@@ -40,6 +40,7 @@ nodes(1) = q_start;
 CL = ClothoidCurve(q_start.coord(1), q_start.coord(2), Center_line.theta(0), Center_line.kappa(0), 0, 1 );
 CL_parent = ClothoidCurve();
 CL_rewiring = ClothoidCurve();
+CL_rewiring_final = ClothoidCurve();
 npts = 100;
 
 %Initializing q_new to starting point in case newly explored node doesnt
@@ -162,6 +163,7 @@ test_portion_track = test_portion_track/100;
    q_min = q_near; 
    C_min = [];
    cost_rewiring = 0;
+   rewire_idx = 0;
    if(length(q_nearest)>=1)
      for k = 1:1:length(q_nearest)
         q_nearest_xy = [q_nearest(k).coord(1), q_nearest(k).coord(2)];
@@ -180,9 +182,19 @@ test_portion_track = test_portion_track/100;
         if cost_rewiring < q_nearest(k).cost
             q_nearest(k).parent = q_new;
             q_nearest(k).cost = cost_rewiring;
+            rewire_idx = k;
         end
      end
    end
+   
+   if rewire_idx ~= 0
+       q_nearest_xy = [q_nearest(rewire_idx).coord(1), q_nearest(rewire_idx).coord(2)];
+       [wayline_num_q_nearest, q_nearest_theta, q_nearest_kappa] = Calc_wayline_num(q_nearest_xy,waypoints, headings, curvatures);
+       CL_rewiring_final.build_G1(q_new.coord(1), q_new.coord(2), q_new_theta, q_nearest(rewire_idx).coord(1), q_nearest(rewire_idx).coord(2), q_nearest_theta);
+       CL_rewiring_final.plot(npts,'Color','blue');
+   end
+   
+   
          
 %     % Append to nodes
      nodes = [nodes q_new];

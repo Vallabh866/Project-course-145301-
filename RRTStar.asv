@@ -2,9 +2,9 @@ clearvars
 close all
 clc
 
-addpath(genpath('E:\Project-course-145301-'));
-addpath('E:\Project-course-145301-\Project-course-145301-\Racetracks\Racetracks\PistaAzzurra_Track');
-run('E:\Project-course-145301-\Project-course-145301-\Racetracks\Racetracks\PistaAzzurra_Track\create_RoadFile.m');
+addpath(genpath('C:\Project-course-145301--main\Project-course-145301--main'));
+addpath('C:\Project-course-145301--main\Project-course-145301--main\Racetracks\Racetracks\PistaAzzurra_Track');
+run('C:\Project-course-145301--main\Project-course-145301--main\Racetracks\Racetracks\PistaAzzurra_Track\create_RoadFile.m');
 
 close all
 
@@ -48,12 +48,12 @@ q_new = q_start;
 q_new.cost = 0;
 
 %Percentage of track to perform the whole logic upon
-test_portion_track = 15;%Percentage
+test_portion_track = 50;%Percentage
 test_portion_track = test_portion_track/100;
 
  for i = 1:1:(waypoints_per_wayline*waylines_count)*test_portion_track
      
-    [wayline_num_last_node, last_node_theta, last_node_curvature] = Calc_wayline_num(nodes(end),waypoints, headings, curvatures);
+    [wayline_num_last_node, last_node_theta, last_node_curvature] = Calc_wayline_num(nodes(end).coord,waypoints, headings, curvatures);
      
     
     rand_waypoint = min(max(floor(rand*10/3),1),3);
@@ -62,8 +62,11 @@ test_portion_track = test_portion_track/100;
     rand_number = floor(rand*2*Horizon_limit)+1;
     
     %rand_wayline = floor((rand*waylines_count)*test_portion_track);
-    if()
-    rand_wayline = (wayline_num_last_node - Horizon_limit) + rand_number;
+    if(wayline_num_last_node>Horizon_limit)
+        rand_wayline = (wayline_num_last_node - Horizon_limit) + rand_number;
+    else
+        rand_wayline = (wayline_num_last_node) + rand_number;
+    end
     
     while(1)
         if(rand_wayline>1)
@@ -159,6 +162,7 @@ test_portion_track = test_portion_track/100;
    q_min = q_near; 
    C_min = [];
    cost_rewiring = 0;
+   rewire_idx = 0;
    if(length(q_nearest)>=1)
      for k = 1:1:length(q_nearest)
         q_nearest_xy = [q_nearest(k).coord(1), q_nearest(k).coord(2)];
@@ -177,9 +181,16 @@ test_portion_track = test_portion_track/100;
         if cost_rewiring < q_nearest(k).cost
             q_nearest(k).parent = q_new;
             q_nearest(k).cost = cost_rewiring;
+            rewire_idx = k;
         end
      end
    end
+   
+   if rewire_idx!= 0
+       
+   
+   
+   
          
 %     % Append to nodes
      nodes = [nodes q_new];

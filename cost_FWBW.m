@@ -9,7 +9,7 @@ set(0,'defaulttextinterpreter','latex')
 set(groot,'defaultAxesTickLabelInterpreter','latex');
 set(groot,'defaultLegendInterpreter','latex');
 
-addpath('../matlab');
+addpath('C:\Project-course-145301--main\Project-course-145301--main\forward-backward_new2\forward-backward_new2\matlab');
 
 %% Limits on longitudinal and lateral acceleration and speed
 Ax_brake_max = 10;      % [m/s^2] max braking deceleration (absolute value)
