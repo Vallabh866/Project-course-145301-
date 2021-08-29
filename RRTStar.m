@@ -17,7 +17,7 @@ Center_line = create_RoadFile();
 %Function to define "way point positions" based on given road center line
 [waypoints, headings, curvatures] = define_waypoints(Center_line);
 [waypoints_per_wayline,waylines_count] = size(waypoints);
-fprintf('%d %d\n',waypoints_per_wayline ,waylines_count);
+fprintf('\nNumber of generated waylines for given road track are: %d \n with %d waypoints per wayline\n',waylines_count, waypoints_per_wayline);
 for k = 1:1:waylines_count
   for m = 1:1:waypoints_per_wayline
     %plot(waypoints{m,k}{1,1}(1,1), waypoints{m,k}{1,1}(1,2), 'x');
@@ -52,6 +52,7 @@ CL_min_cost_parent = ClothoidCurve();
 CL_parent = ClothoidCurve();
 CL_rewiring = ClothoidCurve();
 CL_rewiring_final = ClothoidCurve();
+CL_final_result = ClothoidCurve();
 
 %Initializing q_new to starting point in case newly explored node doesnt
 %find a parent node nearby
@@ -65,6 +66,8 @@ test_portion_track = test_portion_track/100;
 exploration_matrix = zeros(size(waypoints));
 %The starting point is initialized as "explored"
 exploration_matrix(2,1) = 1;
+exploration_saturation_percentage = 90;
+exploration_saturation_percentage = exploration_saturation_percentage/100;
 
 cost_matrix = 10000*ones(size(waypoints));
 %Cost to begin from the 1st wayline is 0
@@ -84,6 +87,16 @@ for k = 1:1:waylines_count
   end
 end
 
+%Matrices containing all the thetas and curvatures "at every wayline"
+%theta_matrix = zeros(1, waylines_count);
+%for i = 1:waylines_count
+%    wayline_centre_xy = [waypoints{2,i}{1,1}(1,1), waypoints{2,i}{1,1}(1,2)];
+%    [~, wayline_theta, wayline_curvature] = Calc_wayline_num(wayline_centre_xy,waypoints, headings, curvatures);
+%    theta_matrix(1,i) = 
+%end
+
+curvature_matrix = zeros(1, waylines_count);
+
 wayline_num_last_node = 1;
 wayline_num_last_node_max = 1;
 loop_iteration_counter = 1;
@@ -97,11 +110,36 @@ goal_reached_counter = 0;
 
  %for i = 1:1:(waypoints_per_wayline*waylines_count)*(test_portion_track/waypoints_per_wayline)
  %while (wayline_num_last_node ~= (waylines_count))
- while (goal_reached_counter < 4)
+ while (1)
     
     if (wayline_num_last_node == (waylines_count))
         goal_reached_counter = goal_reached_counter + 1;
     end
+    
+    
+    %%% These are the 2 goal checking conditions 
+    
+    %%% Condition 1 : Check if the all the waypoints on the last wayline
+    %%% are explored
+    final_saturation_condition_counter = 0;
+    for tmp = 1:waypoints_per_wayline
+        if(exploration_matrix(tmp, waylines_count) == 1)
+            final_saturation_condition_counter = final_saturation_condition_counter + 1;
+        end
+    end
+    
+    %%% Condition 2 : Check if a given percentage of the whole track is
+    %%% explored
+    if (final_saturation_condition_counter >= 1)
+       if sum(exploration_matrix,'all') >= (exploration_saturation_percentage)*(sum((ones(size(waypoints))),'all'))
+            break;
+       end
+    end
+    
+    %%% If both the above conditions are fulfilled then we can stop
+    %%% exploring more and start plotting the final path of the vehicle
+    %%%
+    
      
     %[wayline_num_last_node, last_node_theta, last_node_curvature] = Calc_wayline_num(nodes(end).coord,waypoints, headings, curvatures);
     if(wayline_num_last_node>wayline_num_last_node_max)
@@ -123,17 +161,31 @@ goal_reached_counter = 0;
     
     %rand_wayline = floor((rand*waylines_count)*test_portion_track);
     %if(wayline_num_last_node>Horizon_limit)
-        rand_wayline = min(waylines_count, max(2,((wayline_num_last_node - Horizon_limit) + rand_number)));
+    %    rand_wayline = min(waylines_count, max(2,((wayline_num_last_node - Horizon_limit) + rand_number)));
     %else
     %    rand_wayline = (wayline_num_last_node) + rand_number;
     %end
+    
+    rand_wayline = max(2,((wayline_num_last_node - Horizon_limit) + rand_number));
+    
+    if (rand_wayline > waylines_count)
+        rand_wayline = max(2,(rand_wayline - waylines_count));
+    end
     
     exploration_saturation_counter = 0;
     while(1)
         %Check exploration saturation in case the next Horizon is explored
         exploration_saturation_counter = exploration_saturation_counter + 1;
         
-        if(rand_wayline>1) && (exploration_matrix(rand_waypoint,rand_wayline) ~= 1)
+        %if (rand_wayline > waylines_count)
+        %    rand_wayline = max(2,(rand_wayline - waylines_count));
+        %end
+        
+        if(rand_wayline>waylines_count)
+            disp('Check');
+        end
+        
+        if((rand_wayline>1) && (exploration_matrix(rand_waypoint,rand_wayline) ~= 1))
         break;
         else
             if(exploration_saturation_counter <= 2*Horizon_limit)
@@ -141,15 +193,26 @@ goal_reached_counter = 0;
             else
                 %Horizon_limit_2 = min(6,(Horizon_limit*2)); % Increase the Horizon limit if all the nodes around are explored
                 Horizon_limit_2 = Horizon_limit*2; % Increase the Horizon limit if all the nodes around are explored
-                rand_number = floor(rand*2*Horizon_limit_2)+1;
+                rand_number = rand_number + floor(rand*2*Horizon_limit_2)+1;
+                
+                if(rand_number > waylines_count)
+                    rand_number = rem(rand_number,waylines_count);
+                end                
             end
             rand_waypoint = min(max(floor(rand*10/3),1),3);
             %rand_wayline = floor((rand*waylines_count)*test_portion_track);
             %if(exploration_saturation_counter < 2*Horizon_limit)
-                rand_wayline = min(waylines_count, max(2,((wayline_num_last_node - Horizon_limit) + rand_number)));
+                %rand_wayline = min(waylines_count, max(2,((wayline_num_last_node - Horizon_limit) + rand_number)));
             %else
             %    rand_wayline = (wayline_num_last_node) + rand_number;
             %end
+            
+            rand_wayline = max(2,((wayline_num_last_node - Horizon_limit) + rand_number));
+            
+            if (rand_wayline > waylines_count)
+                %rand_wayline = rand_wayline - waylines_count;
+                rand_wayline = max(2,(rand_wayline - waylines_count));
+            end
         end    
     end
     
@@ -175,12 +238,12 @@ goal_reached_counter = 0;
     %exploration_matrix(rand_waypoint,rand_wayline)=1;
     
     % Break if goal node is already reached
-    for j = 1:1:length(nodes)
-        if nodes(j).coord == q_goal.coord
+    %for j = 1:1:length(nodes)
+    %    if nodes(j).coord == q_goal.coord
             %fprintf("Goal reached");
-            break
-        end
-    end
+    %        break
+    %    end
+    %end
     
     % Pick the closest node from existing list to branch out from
     costs = [];
@@ -431,12 +494,52 @@ goal_reached_counter = 0;
    % end
    %end
    
+   
          
 %     % Append to nodes
      %nodes = [nodes q_new];
  end
  
- disp('End');
+ 
+figure('Name','Optimum path','NumberTitle','off'), clf
+hold on
+axis equal
+
+edge_left.plot;
+edge_right.plot;
+
+%Move backwards from Goal to start based on the parent matrix
+goal_coord = [waypoints{2,ceil(Goal_position_portion_track*waylines_count)}{1,1}(1,1), waypoints{2,ceil(Goal_position_portion_track*waylines_count)}{1,1}(1,2)];
+%[wayline_num_goal, goal_theta, goal_curvature] = Calc_wayline_num(goal_coord,waypoints, headings, curvatures);
+child_temp = goal_coord;
+child_wayline = waylines_count;
+
+parent_wayline = parent_matrix{2, child_wayline}{1,1}(1,2);
+parent_temp = [waypoints{2, parent_wayline}{1,1}(1,1), waypoints{2, parent_wayline}{1,1}(1,2)];
+
+while(1)
+    CL_final_result.build_G1(parent_temp(1), parent_temp(2), headings(1, parent_wayline),child_temp(1), child_temp(2), headings(1, child_wayline));
+    CL_final_result.plot;
+    
+    child_temp = parent_temp;
+    child_wayline = parent_wayline;
+     
+    parent_wayline = parent_matrix{2, child_wayline}{1,1}(1,2); 
+    parent_temp = [waypoints{2, parent_wayline}{1,1}(1,1), waypoints{2, parent_wayline}{1,1}(1,2)];
+    
+    if(parent_wayline == 1)
+        CL_final_result.build_G1(parent_temp(1), parent_temp(2), headings(1, parent_wayline),child_temp(1), child_temp(2), headings(1, child_wayline));
+        CL_final_result.plot;
+        break;
+    end
+end
+
+grid on
+xlabel('x [m]')
+ylabel('y [m]')
+title('Circuit-Final')
+ 
+ 
 % 
 % D = [];
 % for j = 1:1:length(nodes)
@@ -464,3 +567,4 @@ goal_reached_counter = 0;
 %     
 %     q_end = nodes(start);
 % end
+disp('End');
