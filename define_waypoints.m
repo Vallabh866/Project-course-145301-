@@ -99,6 +99,7 @@ function [waypoints, headings, curvatures] = define_waypoints(Center_line)
                     %headings(1,smin) = Center_line.theta(smin+sw(smin));
                     %curvatures(1,smin) = Center_line.kappa(smin+sw(smin));
                     headings = [headings Center_line.theta(next_wayline)];
+                    %headings = [headings (-deg2rad(90)-Center_line.theta(next_wayline))];
                     curvatures = [curvatures Center_line.kappa(next_wayline)];
             %     else
             %         waypoints(1,smin) = waypoints_temp(1,1);
@@ -124,5 +125,8 @@ function [waypoints, headings, curvatures] = define_waypoints(Center_line)
 
            end
     end
+    
+    headings = headings(1,2:end);
+    curvatures = curvatures(1,2:end);
 
 end
