@@ -8,19 +8,65 @@ run('C:\Project-course-145301--main\Project-course-145301--main\Racetracks\Racet
 
 close all
 
-npts = 100;
+fprintf("\n-----------------------------\n");
+Selection = '\nPlease select one option:\n1. Full track exploration\n2. Single corner exploration\n';
+Exploration_option = input(Selection);
+%fprintf("\n1. Full track exploration\n");
+%fprintf("\n2. Single corner exploration\n");
+fprintf("\n-----------------------------\n");
+
+
+% Arrays for storing computation time values
+loop_iteration_time_check_end_array = [];
+initial_conditions_time_end_array = [];
+rand_wayline_generation_time_end_array = [];
+intermediate_logic_1_time_end_array = [];
+parent_spline_generation_time_end_array = [];
+rewiring_spline_generatioin_time_end_array = [];
+total_time_vect=[];
+
+% Array to store the velocity profile of the final path
+total_velocity_profile=[];
+
+%Arrays to store the time vect and velocity profile of individual splines
+time_vect = [];
+speed_profile = [];
+
+%Array to store the length of the splines contained in the final path
+CL_final_path_length=[];
+
+%Array to store the curvature of the splines contained in the final path
+CL_final_path_curv=[];
+
+t_track_creation_start = tic;
 
 %Create track and retrieve clothoid list of the track
 Center_line = ClothoidList;
 Center_line = create_RoadFile();
 
+if(Exploration_option==2)
+    %Center_line = Center_line*0.1;
+    % This condition is specifically for Pista azzura, Change the min and
+    % max value of trim based on the track and the location on the track you wish to
+    % explore
+    s_min = 0;
+    s_max = 200;    
+    
+    %Trim the track to limit the exploration
+    Center_line.trim( s_min, s_max );
+end
+
 %Function to define "way point positions" based on given road center line
 [waypoints, headings, curvatures] = define_waypoints(Center_line);
 [waypoints_per_wayline,waylines_count] = size(waypoints);
-fprintf('\nNumber of generated waylines for given road track are: %d \n with %d waypoints per wayline\n',waylines_count, waypoints_per_wayline);
+
+fprintf('\nNumber of generated waylines for given road track are: %d \n with: %d waypoints per wayline\n',waylines_count, waypoints_per_wayline);
+
+%%% If one wants to plot all the generated waypoints by the
+%%% "define_waypoints" function
 for k = 1:1:waylines_count
   for m = 1:1:waypoints_per_wayline
-    %plot(waypoints{m,k}{1,1}(1,1), waypoints{m,k}{1,1}(1,2), 'x');
+    plot(waypoints{m,k}{1,1}(1,1), waypoints{m,k}{1,1}(1,2), 'x');
   end
 end
 
@@ -29,95 +75,89 @@ edge_left = ClothoidList();
 edge_right = ClothoidList();
 [edge_left, edge_right]=define_road_edges(Center_line);
 
+%Plot the left and right edges of the road
 edge_left.plot;
 edge_right.plot;
 
-%Percentage of track considered as the goal
-Goal_position_portion_track = 100;%Percentage
-Goal_position_portion_track = Goal_position_portion_track/100;
+Horizon_limit = 3; %[number of waylines] Horizon value upto which the RRT algorithm can explore at 1 time step
+v_ini_clothoid = 2.3614;  %[m/s] Initial speed value for the FWBW velocity planner
 
-EPS = 3000;
-Horizon_limit = 3;
-q_start.coord = [waypoints{2,1}{1,1}(1,1), waypoints{2,1}{1,1}(1,2)];
-q_start.cost = 0;
-q_start.parent = 0;
-q_goal.coord = [waypoints{2,ceil(Goal_position_portion_track*waylines_count)}{1,1}(1,1), waypoints{2,ceil(Goal_position_portion_track*waylines_count)}{1,1}(1,2)];
-q_goal.cost = 0;
-v_ini_clothoid = 2.3614;  % [m/s]
-q_start.v_ini_clothoid = v_ini_clothoid;  % [m/s]
+npts = 100;
 
-nodes(1) = q_start;
-CL = ClothoidCurve();
+% Exploration splines
 CL_min_cost_parent = ClothoidCurve();
 CL_parent = ClothoidCurve();
+
+%Rewiring splines
 CL_rewiring = ClothoidCurve();
 CL_rewiring_final = ClothoidCurve();
+
+% Final path splines
 CL_final_result = ClothoidCurve();
 
-%Initializing q_new to starting point in case newly explored node doesnt
-%find a parent node nearby
-q_new = q_start;
-q_new.cost = 0;
-
-%Percentage of track to perform the whole logic upon
-test_portion_track = 150;%Percentage
-test_portion_track = test_portion_track/100;
-
+% An "exploration matrix" indicating status of explored and unexplored
+% nodes
 exploration_matrix = zeros(size(waypoints));
+
 %The starting point is initialized as "explored"
 exploration_matrix(2,1) = 1;
-exploration_saturation_percentage = 90;
+
+% Percentage of the waypoints to be explored before finalizing the
+% optimal path
+exploration_saturation_percentage = 94;
 exploration_saturation_percentage = exploration_saturation_percentage/100;
 
-cost_matrix = 10000*ones(size(waypoints));
-%Cost to begin from the 1st wayline is 0
+% A "cost matrix" indicating the minimum cost required to reach a waypoint
+% from the start of the track
+cost_matrix = 10000*ones(size(waypoints)); % inf instead of 10000
+
+% Cost to begin from the 1st wayline is 0
 cost_matrix(1,1)=0;
 cost_matrix(2,1)=0;
 cost_matrix(3,1)=0;
 
+% A "v_ini_clothoid" matrix to indicate the velocity at each point by the
+% velocity planner
 v_ini_clothoid_matrix = v_ini_clothoid*ones(size(waypoints));
 parent_matrix = waypoints;
 
 %Initialize all contents of the parent matrix to 0
 for k = 1:1:waylines_count
   for m = 1:1:waypoints_per_wayline
-    %plot(waypoints{m,k}{1,1}(1,1), waypoints{m,k}{1,1}(1,2), 'x');
     parent_matrix{m,k}{1,1}(1,1) = 0;
     parent_matrix{m,k}{1,1}(1,2) = 0;
   end
 end
 
-%Matrices containing all the thetas and curvatures "at every wayline"
-%theta_matrix = zeros(1, waylines_count);
-%for i = 1:waylines_count
-%    wayline_centre_xy = [waypoints{2,i}{1,1}(1,1), waypoints{2,i}{1,1}(1,2)];
-%    [~, wayline_theta, wayline_curvature] = Calc_wayline_num(wayline_centre_xy,waypoints, headings, curvatures);
-%    theta_matrix(1,i) = 
-%end
-
+% A "curvature" matrix indicating the curvature at each wayline
 curvature_matrix = zeros(1, waylines_count);
 
+% Initializing the "wayline number explored at last iteration"
 wayline_num_last_node = 1;
-wayline_num_last_node_max = 1;
-loop_iteration_counter = 1;
 
+% Initializing the "farthest wayline" that the RRT exploration has reached
+wayline_num_last_node_max = 1;
+
+% Binary variables used to indicate need for expanding the horizon if the explorer is stuck near
+% the end of the track but is not close enough to the goal
 finish_line_closeness_check_1 = 0;
 finish_line_closeness_check_2 = 0;
 
 Horizon_limit_tmp = Horizon_limit;
 
-goal_reached_counter = 0;
+t_track_creation_end = toc(t_track_creation_start);
+fprintf("\nIt took %d seconds for the Track to be created along with the waylines\n", t_track_creation_end);
 
- %for i = 1:1:(waypoints_per_wayline*waylines_count)*(test_portion_track/waypoints_per_wayline)
- %while (wayline_num_last_node ~= (waylines_count))
- while (1)
+
+t_RRT_star_exploration_start = tic;
+
+ while (1)    
     
-    if (wayline_num_last_node == (waylines_count))
-        goal_reached_counter = goal_reached_counter + 1;
-    end
+    loop_iteration_time_check = tic;
     
-    
-    %%% These are the 2 goal checking conditions 
+    initial_conditions_time_start = tic;
+     
+    %%% Check for the 2 goal reached conditions 
     
     %%% Condition 1 : Check if the all the waypoints on the last wayline
     %%% are explored
@@ -130,41 +170,24 @@ goal_reached_counter = 0;
     
     %%% Condition 2 : Check if a given percentage of the whole track is
     %%% explored
-    if (final_saturation_condition_counter >= 1)
-       if sum(exploration_matrix,'all') >= (exploration_saturation_percentage)*(sum((ones(size(waypoints))),'all'))
-            break;
-       end
-    end
-    
+        if (final_saturation_condition_counter >= 1)
+           if sum(exploration_matrix,'all') >= (exploration_saturation_percentage)*(sum((ones(size(waypoints))),'all'))
+                break; % Stop the RRT* exploration
+           end
+        end
+        
     %%% If both the above conditions are fulfilled then we can stop
     %%% exploring more and start plotting the final path of the vehicle
-    %%%
-    
+    %%%    
      
-    %[wayline_num_last_node, last_node_theta, last_node_curvature] = Calc_wayline_num(nodes(end).coord,waypoints, headings, curvatures);
+    % Storing the farthest wayline that the algorithm has reached
     if(wayline_num_last_node>wayline_num_last_node_max)
         wayline_num_last_node_max = wayline_num_last_node;
     end
     
-    if(wayline_num_last_node_max > (waylines_count - 2*Horizon_limit_tmp))
-        Horizon_limit = Horizon_limit_tmp+1;
-    elseif(wayline_num_last_node_max > (waylines_count - Horizon_limit_tmp + 1))
-        Horizon_limit = Horizon_limit_tmp+2;
-    %elseif(wayline_num_last_node_max > (waylines_count - 2*Horizon_limit_tmp + 2))
-    %    Horizon_limit = 4*Horizon_limit_tmp;
-    end
-    
     rand_waypoint = min(max(floor(rand*10/3),1),3);
-    %rand_wayline = min((i+floor(rand*Horizon_limit)),waylines_count);
     
     rand_number = floor(rand*2*Horizon_limit)+1;
-    
-    %rand_wayline = floor((rand*waylines_count)*test_portion_track);
-    %if(wayline_num_last_node>Horizon_limit)
-    %    rand_wayline = min(waylines_count, max(2,((wayline_num_last_node - Horizon_limit) + rand_number)));
-    %else
-    %    rand_wayline = (wayline_num_last_node) + rand_number;
-    %end
     
     rand_wayline = max(2,((wayline_num_last_node - Horizon_limit) + rand_number));
     
@@ -173,17 +196,14 @@ goal_reached_counter = 0;
     end
     
     exploration_saturation_counter = 0;
+    
+    initial_conditions_time_end = toc(initial_conditions_time_start);
+    
+    rand_wayline_generation_time_start = tic;
+    
     while(1)
         %Check exploration saturation in case the next Horizon is explored
         exploration_saturation_counter = exploration_saturation_counter + 1;
-        
-        %if (rand_wayline > waylines_count)
-        %    rand_wayline = max(2,(rand_wayline - waylines_count));
-        %end
-        
-        if(rand_wayline>waylines_count)
-            disp('Check');
-        end
         
         if((rand_wayline>1) && (exploration_matrix(rand_waypoint,rand_wayline) ~= 1))
         break;
@@ -191,7 +211,6 @@ goal_reached_counter = 0;
             if(exploration_saturation_counter <= 2*Horizon_limit)
                 rand_number = floor(rand*2*Horizon_limit)+1;
             else
-                %Horizon_limit_2 = min(6,(Horizon_limit*2)); % Increase the Horizon limit if all the nodes around are explored
                 Horizon_limit_2 = Horizon_limit*2; % Increase the Horizon limit if all the nodes around are explored
                 rand_number = rand_number + floor(rand*2*Horizon_limit_2)+1;
                 
@@ -200,25 +219,21 @@ goal_reached_counter = 0;
                 end                
             end
             rand_waypoint = min(max(floor(rand*10/3),1),3);
-            %rand_wayline = floor((rand*waylines_count)*test_portion_track);
-            %if(exploration_saturation_counter < 2*Horizon_limit)
-                %rand_wayline = min(waylines_count, max(2,((wayline_num_last_node - Horizon_limit) + rand_number)));
-            %else
-            %    rand_wayline = (wayline_num_last_node) + rand_number;
-            %end
             
             rand_wayline = max(2,((wayline_num_last_node - Horizon_limit) + rand_number));
             
             if (rand_wayline > waylines_count)
-                %rand_wayline = rand_wayline - waylines_count;
                 rand_wayline = max(2,(rand_wayline - waylines_count));
             end
         end    
     end
     
+    rand_wayline_generation_time_end = toc(rand_wayline_generation_time_start);
+    
+    intermediate_logic_1_time_start = tic;
+    
     if(rand_wayline > waylines_count)
         rand_wayline = max(2,(rand_wayline - waylines_count));
-        loop_iteration_counter = loop_iteration_counter + 1;
     end
     
     if((wayline_num_last_node_max > (waylines_count - 2*Horizon_limit_tmp)) && finish_line_closeness_check_1 == 0)
@@ -227,166 +242,100 @@ goal_reached_counter = 0;
     elseif((wayline_num_last_node_max > (waylines_count - Horizon_limit_tmp)) && finish_line_closeness_check_2 == 0)
         rand_wayline = waylines_count - Horizon_limit_tmp + 2;
         finish_line_closeness_check_2 = 1;
-    %elseif(wayline_num_last_node_max > (waylines_count - 2*Horizon_limit + 2))
-    %    Horizon_limit = 4*Horizon_limit_tmp;
     end
     
     q_rand = [waypoints{rand_waypoint,rand_wayline}{1,1}(1,1), waypoints{rand_waypoint,rand_wayline}{1,1}(1,2)];
     
     plot(q_rand(1), q_rand(2), 'x', 'Color',  [0 0.4470 0.7410]);
     
-    %exploration_matrix(rand_waypoint,rand_wayline)=1;
-    
-    % Break if goal node is already reached
-    %for j = 1:1:length(nodes)
-    %    if nodes(j).coord == q_goal.coord
-            %fprintf("Goal reached");
-    %        break
-    %    end
-    %end
-    
     % Pick the closest node from existing list to branch out from
     costs = [];
-    [~ , qrand_theta, qrand_curvature] = Calc_wayline_num(q_rand,waypoints, headings, curvatures);
-    
-    %q_rand_xy = [q_rand(1), q_rand(2)];
-    %[wayline_num_q_rand, q_rand_theta, q_rand_kappa] = Calc_wayline_num(q_rand_xy,waypoints, headings, curvatures);
+    %[~ , qrand_theta, qrand_curvature] = Calc_wayline_num(q_rand,waypoints, headings, curvatures);
+    qrand_theta = headings(1, rand_wayline);
+    qrand_curvature = curvatures(1, rand_wayline);
 
     tmp = 10000;
     max_cost = tmp;
     min_cost = tmp;
-    %for j = 1:1:length(nodes)
+    
+    intermediate_logic_1_time_end = toc(intermediate_logic_1_time_start);
+    
+    parent_spline_generation_time_start = tic;
+    
     for parent_node_wayline =  max(1,(rand_wayline-Horizon_limit)):1:max(1,(rand_wayline-1))
-        
-         %if ((i == 1) && (parent_node_wayline ~= 1))
-         %     continue;
-         %end
         
         for parent_node_waypoint = 1:1:waypoints_per_wayline
             
-            %if ((parent_node_wayline == 1) && (parent_node_waypoint ~= 2))
-            %  continue;
-            %end
-            
             if(exploration_matrix(parent_node_waypoint,parent_node_wayline) == 1) % Dont re-explore previously explored nodes
-                
-                intersection_detected = 1;
 
                 parent_node_xy = [waypoints{parent_node_waypoint, parent_node_wayline}{1,1}(1,1), waypoints{parent_node_waypoint, parent_node_wayline}{1,1}(1,2)];
-                [wayline_num_parent_node, parent_node_theta, parent_node_curvature] = Calc_wayline_num(parent_node_xy,waypoints, headings, curvatures);
+                %[wayline_num_parent_node, parent_node_theta, parent_node_curvature] = Calc_wayline_num(parent_node_xy,waypoints, headings, curvatures);
+                
+                parent_node_theta = headings(1, parent_node_wayline);
+                parent_node_curvature = curvatures(1, parent_node_wayline);
 
-                %if((wayline_num_node < rand_wayline)&& (rand_wayline<=wayline_num_node+Horizon_limit))
-                    CL_parent.build_G1(parent_node_xy(1), parent_node_xy(2), parent_node_theta, q_rand(1), q_rand(2), qrand_theta);
-                    CL_s = CL_parent.length;
+                 CL_parent.build_G1(parent_node_xy(1), parent_node_xy(2), parent_node_theta, q_rand(1), q_rand(2), qrand_theta);
+                 CL_s = CL_parent.length;
 
-                    %nodes_j_xy = [nodes(j).coord(1), nodes(j).coord(2)];
-                    %[wayline_num_nodes_j, nodes_j_theta, nodes_j_kappa] = Calc_wayline_num(nodes_j_xy,waypoints, headings, curvatures);
+                 [cost, v_ini_clothoid, time_vect, speed_profile] = cost_FWBW(CL_s, parent_node_curvature,qrand_curvature,v_ini_clothoid_matrix(parent_node_waypoint, parent_node_wayline));
 
-                    %q_rand_xy = [q_rand(1), q_rand(2)];
-                    %[wayline_num_q_rand, q_rand_theta, q_rand_kappa] = Calc_wayline_num(q_rand_xy,waypoints, headings, curvatures);
-
-                    [cost, v_ini_clothoid] = cost_FWBW(CL_s, parent_node_curvature,qrand_curvature,v_ini_clothoid_matrix(parent_node_waypoint, parent_node_wayline));
-
-                    % Check the intersection
-                    s_inters_left = CL_parent.intersect(edge_left);
-                    s_inters_right = CL_parent.intersect(edge_right);
-                    if (isempty(s_inters_left) && isempty(s_inters_right))
-                        % this means that no intersection exists
-                        intersection_detected = 0;
+                 % Check the intersection
+                 s_inters_left = CL_parent.intersect(edge_left);
+                 s_inters_right = CL_parent.intersect(edge_right);
+                 if (isempty(s_inters_left) && isempty(s_inters_right))
+                    % this means that no intersection exists
                         
-                        if(cost < min_cost) % Find minimum cost parent
-                            min_cost = cost;
-                            %Update the minimum cost in the cost matrix
-                            if (parent_node_wayline == 1)
-                                cost_matrix(rand_waypoint,rand_wayline) = min_cost;% + 0 //because cost of being on the 1st wayline is 0
-                            else
-                                cost_matrix(rand_waypoint,rand_wayline) = min_cost + cost_matrix(parent_node_waypoint,parent_node_wayline);
-                            end
-                            
-                            %Update the parent
-                            %parent_matrix(q_rand(1), q_rand(2)) = 
-                            parent_matrix{rand_waypoint,rand_wayline}{1,1}(1,1) = parent_node_waypoint;
-                            parent_matrix{rand_waypoint,rand_wayline}{1,1}(1,2) = parent_node_wayline;
-                            
-                            %Store the position of the parent
-                            min_cost_parent_node_waypoint = parent_node_waypoint;
-                            min_cost_parent_node_wayline = parent_node_wayline;
-                            
-                            %Store the spline from the parent to newly
-                            %explored node, to be used to plot later
-                            CL_min_cost_parent = CL_parent;
-                            
-                            %Store the spline length of the min cost parent
-                            CL_s_min_cost_parent = CL_s;
-                            
-                            %Store the v_ini_clothoid at the newly explored
-                            %node
-                            v_ini_clothoid_matrix(rand_waypoint,rand_wayline) = v_ini_clothoid;
-                            
-                            %Update exploration matrix with the explored node position
-                            exploration_matrix(rand_waypoint,rand_wayline)=1;
-                            
-                            %Store the wayline of the latest explored node as the last explored wayline
-                            wayline_num_last_node =  rand_wayline;
+                    if(cost < min_cost) % Find minimum cost parent
+                        min_cost = cost;
+                        %Update the minimum cost in the cost matrix
+                        if (parent_node_wayline == 1)
+                            cost_matrix(rand_waypoint,rand_wayline) = min_cost;% + 0 //because cost of being on the 1st wayline is 0
+                        else
+                            cost_matrix(rand_waypoint,rand_wayline) = min_cost + cost_matrix(parent_node_waypoint,parent_node_wayline);
                         end
-
+                            
+                        %Update the parent
+                        %parent_matrix(q_rand(1), q_rand(2)) = 
+                        parent_matrix{rand_waypoint,rand_wayline}{1,1}(1,1) = parent_node_waypoint;
+                        parent_matrix{rand_waypoint,rand_wayline}{1,1}(1,2) = parent_node_wayline;
+                            
+                        %Store the position of the parent
+                        min_cost_parent_node_waypoint = parent_node_waypoint;
+                        min_cost_parent_node_wayline = parent_node_wayline;
+                           
+                        %Store the spline from the parent to newly
+                        %explored node, to be used to plot later
+                        CL_min_cost_parent = CL_parent;
+                            
+                        %Store the spline length of the min cost parent
+                        CL_s_min_cost_parent = CL_s;
+                           
+                        %Store the v_ini_clothoid at the newly explored
+                        %node
+                        v_ini_clothoid_matrix(rand_waypoint,rand_wayline) = v_ini_clothoid;
+                            
+                        %Update exploration matrix with the explored node position
+                        exploration_matrix(rand_waypoint,rand_wayline)=1;
+                            
+                        %Store the wayline of the latest explored node as the last explored wayline
+                        wayline_num_last_node =  rand_wayline;
+                        
+                        %Store the speed profile of the minimum cost spline
+                        time_vect_temp = time_vect;
+                        speed_profile_vect_temp = speed_profile;
+                        
                     end
-        %     
-        %            q_rand.v_ini_clothoid = v_ini_clothoid;
-        %         
-                    %q_new.cost = cost;
-                    %tmp=cost;
-                    %tmp = CL_parent.length;
-                %end
-                %n = nodes(j);
-                %tmp = dist(n.coord, q_rand);
-                %if intersection_detected == 0
-                %    costs = [costs tmp];
-                %    cost_matrix(parent_node_waypoint, parent_node_wayline) = tmp;
-                %end
+                end
             end
         end
     end
     
-    %if(isempty(costs))
-        %disp('Costs array empty');
-    %end
     
-    %[min_cost, idx] = min(costs);
-    
-    %if ((min_cost == max_cost) || (isempty(costs)))
-        %q_near = nodes(last);
-        %continue;
-    %else
-        %q_near = nodes(last);
-        %q_near = nodes(idx);
-    %end
-    
-    %q_new.coord(1) = q_rand(1);
-    %q_new.coord(2) = q_rand(2);
-
-    %q_near_xy = [q_near.coord(1), q_near.coord(2)];
-    %q_near_xy = [min_cost_parent_node_waypoint, min_cost_parent_node_wayline];
-    %[wayline_num_q_near, q_near_theta, q_near_kappa] = Calc_wayline_num(q_near_xy,waypoints, headings, curvatures);
-    
-    %q_new_xy = [q_new.coord(1), q_new.coord(2)];
-    %q_new_xy = [q_rand(1), q_rand(2)];
-    %[wayline_num_q_new, q_new_theta, q_new_kappa] = Calc_wayline_num(q_new_xy,waypoints, headings, curvatures);
-    
-    %CL.build_G1(q_near_xy(1), q_near_xy(2), q_near_theta, q_new_xy(1), q_new_xy(2), q_new_theta);
     CL_min_cost_parent.plot(npts,'Color','red');
     
-    %Store the wayline of the latest explored node as the last explored wayline
-    % wayline_num_last_node =  rand_wayline;
-   
-
-    %CL_s = CL.length;
+    parent_spline_generation_time_end = toc(parent_spline_generation_time_start);
      
-    %[cost, v_ini_clothoid] = cost_FWBW(CL_s_min_cost_parent, q_near_kappa,qrand_curvature,v_ini_clothoid);     
-     
-    %q_new.v_ini_clothoid = v_ini_clothoid;         
-    %q_new.cost = q_near.cost + cost;
-     
+    rewiring_spline_generatioin_time_start = tic;
 %   Rewiring begins
 
      q_nearest = [];
@@ -400,12 +349,14 @@ goal_reached_counter = 0;
             if(exploration_matrix(rewiring_node_waypoint,rewiring_node_wayline) == 1) % Consider only explored nodes from the  waylines ahead for rewiring
                 
                 rewiring_node_xy = [waypoints{rewiring_node_waypoint,rewiring_node_wayline}{1,1}(1,1), waypoints{rewiring_node_waypoint,rewiring_node_wayline}{1,1}(1,2)];
-                [wayline_num_rewiring_node, rewiring_node_theta, rewiring_node_curvature] = Calc_wayline_num(rewiring_node_xy,waypoints, headings, curvatures);
+                %[wayline_num_rewiring_node, rewiring_node_theta, rewiring_node_curvature] = Calc_wayline_num(rewiring_node_xy,waypoints, headings, curvatures);
+                rewiring_node_theta = headings(1,rewiring_node_wayline);
+                rewiring_node_curvature = curvatures(1,rewiring_node_wayline);
                 
                 CL_rewiring.build_G1(q_rand(1), q_rand(2), qrand_theta, rewiring_node_xy(1), rewiring_node_xy(2), rewiring_node_theta);
                 CL_s_rewiring = CL_rewiring.length;
                 
-                [cost_rewiring, v_ini_clothoid_rewiring] = cost_FWBW(CL_s_rewiring, qrand_curvature,rewiring_node_curvature,v_ini_clothoid_matrix(rand_waypoint,rand_wayline));
+                [cost_rewiring, v_ini_clothoid_rewiring, time_vect, speed_profile] = cost_FWBW(CL_s_rewiring, qrand_curvature,rewiring_node_curvature,v_ini_clothoid_matrix(rand_waypoint,rand_wayline));
                 
                 cost_rewiring = cost_rewiring + cost_matrix(rand_waypoint,rand_wayline);
                 
@@ -430,53 +381,21 @@ goal_reached_counter = 0;
                         rewired_node_waypoint = rewiring_node_waypoint;
                         rewired_node_wayline = rewiring_node_wayline;
                         rewired_node_theta = rewiring_node_theta;
+                        
+                        %Store the speed profile of the minimum cost spline
+                        time_vect_temp = time_vect;
+                        speed_profile_vect_temp = speed_profile;
                     end
                 end
-                %node_xy = [nodes(j).coord(1), nodes(j).coord(2)];
-                %[wayline_num_node, node_theta, node_curvature] = Calc_wayline_num(node_xy,waypoints, headings, curvatures);
-                %if(wayline_num_node > wayline_num_q_new)&&(wayline_num_node<=wayline_num_q_new+Horizon_limit)
-                %     q_nearest(neighbor_count).coord = nodes(j).coord;
-                %     q_nearest(neighbor_count).cost = nodes(j).cost;
-                %     q_nearest(neighbor_count).v_ini_clothoid = nodes(j).v_ini_clothoid;
-                %    neighbor_count = neighbor_count+1;
-                %end
             end
         end
      end
-    
-
-%    q_min = q_near; 
-%    C_min = [];
-%    cost_rewiring = 0;
-%    rewire_idx = 0;
-%    if(length(q_nearest)>=1)
-%      for k = 1:1:length(q_nearest)
-%         q_nearest_xy = [q_nearest(k).coord(1), q_nearest(k).coord(2)];
-%         [wayline_num_q_nearest, q_nearest_theta, q_nearest_kappa] = Calc_wayline_num(q_nearest_xy,waypoints, headings, curvatures);
-%         
-%         CL_rewiring.build_G1(q_new.coord(1), q_new.coord(2), q_new_theta, q_nearest(k).coord(1), q_nearest(k).coord(2), q_nearest_theta);
-%         CL_s_rewiring = CL_rewiring.length;
-%               
-%         %q_new_xy = [q_new.coord(1), q_new.coord(2)];
-%         %[wayline_num_q_new, q_new_theta, q_new_kappa] = Calc_wayline_num(q_new_xy,waypoints, headings, curvatures);
-%               
-%         [cost_rewiring, v_ini] = cost_FWBW(CL_s_rewiring, q_new_kappa,q_nearest_kappa,q_nearest(k).v_ini_clothoid);
-%         cost_rewiring = cost_rewiring + q_new.cost;
-% 
-%         if cost_rewiring < q_nearest(k).cost
-%             q_nearest(k).parent = q_new;
-%             q_nearest(k).cost = cost_rewiring;
-%             rewire_idx = k;
-%         end
-%      end
-%    end
-   
-   %if rewire_idx ~= 0
+     
+   total_time_vect = [total_time_vect time_vect_temp];
+   total_velocity_profile = [total_velocity_profile speed_profile_vect_temp];
    
    if rewiring_check ~= 0
        rewired_node_xy = [waypoints{rewired_node_waypoint, rewired_node_wayline}{1,1}(1,1), waypoints{rewired_node_waypoint, rewired_node_wayline}{1,1}(1,2)];
-       %q_nearest_xy = [q_nearest(rewire_idx).coord(1), q_nearest(rewire_idx).coord(2)];
-       %[wayline_num_q_nearest, q_nearest_theta, q_nearest_kappa] = Calc_wayline_num(q_nearest_xy,waypoints, headings, curvatures);
        CL_rewiring_final.build_G1(q_rand(1), q_rand(2), qrand_theta, rewired_node_xy(1), rewired_node_xy(2), rewired_node_theta);
        CL_rewiring_final.plot(npts,'Color','blue');
        
@@ -484,23 +403,54 @@ goal_reached_counter = 0;
         wayline_num_last_node =  rewired_node_wayline;
    end
    
+   rewiring_spline_generatioin_time_end = toc(rewiring_spline_generatioin_time_start);
+   
+   loop_iteration_time_check_end = toc(loop_iteration_time_check);
+   
+   % Create computation time arrays for plotting later
+   loop_iteration_time_check_end_array = [loop_iteration_time_check_end_array 10*loop_iteration_time_check_end];
+   initial_conditions_time_end_array = [initial_conditions_time_end_array 10*initial_conditions_time_end];
+   rand_wayline_generation_time_end_array = [rand_wayline_generation_time_end_array 10*rand_wayline_generation_time_end];
+   intermediate_logic_1_time_end_array = [intermediate_logic_1_time_end_array 10*intermediate_logic_1_time_end];
+   parent_spline_generation_time_end_array = [parent_spline_generation_time_end_array 10*parent_spline_generation_time_end];
+   rewiring_spline_generatioin_time_end_array = [rewiring_spline_generatioin_time_end_array 10*rewiring_spline_generatioin_time_end];
    
    
-   %for k = 1:1:waylines_count
-   % for l = 1:1:waypoints_per_wayline
-   %     if exploration_matrix(l,k)
-   %     wayline_num_last_node
-       
-   % end
-   %end
+   %fprintf("\nLoop iteration time is :%d =>\n %d + %d + %d + %d + %d\n", %loop_iteration_time_check_end, initial_conditions_time_end, ...
+   %rand_wayline_generation_time_end, intermediate_logic_1_time_end, parent_spline_generation_time_end, rewiring_spline_generatioin_time_end);
    
-   
-         
-%     % Append to nodes
-     %nodes = [nodes q_new];
  end
  
+%  figure('Name', 'Computation Time consumption checker'), clf
+%    hold on
+%    axis equal   
+%    plot(loop_iteration_time_check_end_array, 'o');
+%    %hold on
+%    plot(initial_conditions_time_end_array, '--');
+%    %hold on
+%    plot(rand_wayline_generation_time_end_array, '*');
+%    %hold on
+%    plot(intermediate_logic_1_time_end_array, 's');
+%    %hold on
+%    plot(parent_spline_generation_time_end_array, 'd');
+%    %hold on
+%    plot(rewiring_spline_generatioin_time_end_array, '>');
+%    
+%    grid on
+%    xlabel('iteration number [-]')
+%    ylabel('duration [sec]')
+%    title('Computation time')
+   
+%   grid on
+%   xlabel('iteration number [-]')
+%   ylabel('duration [sec]')
+%   title('Computation time')
  
+ t_RRT_star_exploration_end = toc(t_RRT_star_exploration_start);
+ 
+ fprintf("\nIt took %d seconds for the RRT* exploration\n", t_RRT_star_exploration_end);
+ 
+t_final_path_plot_start = tic; 
 figure('Name','Optimum path','NumberTitle','off'), clf
 hold on
 axis equal
@@ -509,23 +459,35 @@ edge_left.plot;
 edge_right.plot;
 
 %Move backwards from Goal to start based on the parent matrix
-goal_coord = [waypoints{2,ceil(Goal_position_portion_track*waylines_count)}{1,1}(1,1), waypoints{2,ceil(Goal_position_portion_track*waylines_count)}{1,1}(1,2)];
-%[wayline_num_goal, goal_theta, goal_curvature] = Calc_wayline_num(goal_coord,waypoints, headings, curvatures);
+goal_coord = [waypoints{2,waylines_count}{1,1}(1,1), waypoints{2,waylines_count}{1,1}(1,2)];
+%goal_coord = [waypoints{2,wayline_num_last_node_max}{1,1}(1,1), waypoints{2,wayline_num_last_node_max}{1,1}(1,2)];
 child_temp = goal_coord;
 child_wayline = waylines_count;
+%child_wayline = wayline_num_last_node_max;
 
 parent_wayline = parent_matrix{2, child_wayline}{1,1}(1,2);
 parent_temp = [waypoints{2, parent_wayline}{1,1}(1,1), waypoints{2, parent_wayline}{1,1}(1,2)];
+
+CL_final_path_curv = 0;
 
 while(1)
     CL_final_result.build_G1(parent_temp(1), parent_temp(2), headings(1, parent_wayline),child_temp(1), child_temp(2), headings(1, child_wayline));
     CL_final_result.plot;
     
+    CL_final_path_length=[CL_final_path_length CL_final_result.length];
+    CL_final_path_curv = [CL_final_path_curv CL_final_result.kappa(CL_final_result.length)];
+    
     child_temp = parent_temp;
     child_wayline = parent_wayline;
      
-    parent_wayline = parent_matrix{2, child_wayline}{1,1}(1,2); 
-    parent_temp = [waypoints{2, parent_wayline}{1,1}(1,1), waypoints{2, parent_wayline}{1,1}(1,2)];
+    parent_wayline = parent_matrix{2, child_wayline}{1,1}(1,2);
+    
+    if (parent_wayline > 0)
+        parent_temp = [waypoints{2, parent_wayline}{1,1}(1,1), waypoints{2, parent_wayline}{1,1}(1,2)];
+    else
+        disp('discontinuity detected in final path');
+        break;
+    end
     
     if(parent_wayline == 1)
         CL_final_result.build_G1(parent_temp(1), parent_temp(2), headings(1, parent_wayline),child_temp(1), child_temp(2), headings(1, child_wayline));
@@ -534,37 +496,32 @@ while(1)
     end
 end
 
+%%% If one wants to plot all the generated waypoints by the
+%%% "define_waypoints" function
+for k = 1:1:waylines_count
+%for k = 1:1:wayline_num_last_node_max
+  for m = 1:1:waypoints_per_wayline
+    plot(waypoints{m,k}{1,1}(1,1), waypoints{m,k}{1,1}(1,2), 'x');
+  end
+end
+
 grid on
 xlabel('x [m]')
 ylabel('y [m]')
 title('Circuit-Final')
- 
- 
-% 
-% D = [];
-% for j = 1:1:length(nodes)
-%     tmpdist = dist(nodes(j).coord, q_goal.coord);
-%     %fprintf("Nodes: %d \n", nodes(j).coord);
-%     D = [D tmpdist];
-% end
-% 
-% 
-% % Search backwards from goal to start to find the optimal least cost path
-% [val, idx] = min(D);    
-% q_final = nodes(idx);
-% q_goal.parent = idx;
-% q_end = q_goal;
-% nodes = [nodes q_goal];
-% final_nodes = [];
-% while q_end.parent ~= 0
-%     start = q_end.parent;
-%     line([q_end.coord(1), nodes(start).coord(1)], [q_end.coord(2), nodes(start).coord(2)], 'Color', 'r', 'LineWidth', 2);
-%     hold on
-%     %fprintf("Line nodes: %d %d\n",nodes(start).coord(1), nodes(start).coord(2) );
-%     final_nodes = [final_nodes ; nodes(start).coord(1), nodes(start).coord(2)];
-%     final_nodes = unique(final_nodes, 'rows', 'stable');
-%     %instantaneous_theta = atan()
-%     
-%     q_end = nodes(start);
-% end
-disp('End');
+
+t_final_path_plot_end = toc(t_final_path_plot_start);
+
+fprintf("\nIt took %d seconds for plotting the final plot\n", t_final_path_plot_end);
+
+[cost_final_path, v_ini_clothoid_final_path, time_vect_final_path, speed_profile_final_path] = cost_FWBW(CL_final_path_length, CL_final_path_curv(1, 1:(end-1)),CL_final_path_curv(1, end),v_ini_clothoid_matrix(2,1));
+
+figure('Name','Speed Profile','NumberTitle','off'), clf
+hold on
+axis equal
+plot(time_vect_final_path,  speed_profile_final_path, 'x');
+grid on
+xlabel('t[0.01s]')
+ylabel('v(m/s)')
+
+fprintf('\n------------------End------------------\n');
