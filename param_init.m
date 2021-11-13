@@ -75,6 +75,7 @@ CL_rewiring_final = ClothoidCurve();
 
 % Final path splines
 CL_final_result = ClothoidCurve();
+CL_final_result_combined = ClothoidList();
 
 % An "exploration matrix" indicating status of explored and unexplored
 % nodes

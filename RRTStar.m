@@ -81,7 +81,8 @@ t_final_path_plot_end = toc(t_final_path_plot_start);
 
 fprintf("\nIt took %d seconds for plotting the final plot\n", t_final_path_plot_end);
 
-[cost_final_path, v_ini_clothoid_final_path, time_vect_final_path, speed_profile_final_path] = cost_FWBW(CL_final_path_length, CL_final_path_curv(1, 1:(end-1)),CL_final_path_curv(1, end),v_ini_clothoid_matrix(2,1));
+[cost_final_path, v_ini_clothoid_final_path, time_vect_final_path, speed_profile_final_path] = ...
+    cost_FWBW(CL_final_path_length, CL_final_path_curv(1, 1:(end-1)),CL_final_path_curv(1, end),v_ini_clothoid_matrix(2,1));
 
 figure('Name','Speed Profile','NumberTitle','off'), clf
 hold on
