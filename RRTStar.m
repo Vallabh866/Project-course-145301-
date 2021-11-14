@@ -54,7 +54,7 @@ t_RRT_star_exploration_start = tic;
     run(strcat(project_folder,'\Forward_exploration.m'));
     CL_min_cost_parent.plot(npts,'Color','red');
 
-    %   Perform Rewiring to refine the planned path
+    % Perform Rewiring to refine the planned path
    run(strcat(project_folder,'\Rewiring.m'));
    
  end
@@ -81,8 +81,21 @@ t_final_path_plot_end = toc(t_final_path_plot_start);
 
 fprintf("\nIt took %d seconds for plotting the final plot\n", t_final_path_plot_end);
 
-[cost_final_path, v_ini_clothoid_final_path, time_vect_final_path, speed_profile_final_path] = ...
+[cost_final_path, v_ini_clothoid_final_path, time_vect_final_path, speed_profile_final_path, final_path_curv_absc_vect] = ...
     cost_FWBW(CL_final_path_length, CL_final_path_curv(1, 1:(end-1)),CL_final_path_curv(1, end),v_ini_clothoid_matrix(2,1));
+
+%Plot the velocity values along the track
+x_final_path_vect=[];
+y_final_path_vect=[];
+[~,final_path_curv_absc_vect_size]=size(final_path_curv_absc_vect);
+for i = 1:final_path_curv_absc_vect_size
+    [x_final_path, y_final_path] = CL_final_result_combined.evaluate(final_path_curv_absc_vect(i));
+    x_final_path_vect = [x_final_path_vect x_final_path];
+    y_final_path_vect = [y_final_path_vect y_final_path];
+    %plot3(x_final_path, y_final_path, speed_profile_final_path(i));    
+end
+
+%disp([x_final_path, y_final_path]);
 
 figure('Name','Speed Profile','NumberTitle','off'), clf
 hold on
@@ -91,5 +104,13 @@ plot(time_vect_final_path,  speed_profile_final_path, 'x');
 grid on
 xlabel('t[0.01s]')
 ylabel('v(m/s)')
+
+figure('Name','Speed Profile over the track','NumberTitle','off'), clf
+%CL_final_result_combined.plot();
+plot3(x_final_path_vect, y_final_path_vect, speed_profile_final_path, 'x');
+grid on
+xlabel('x [m]')
+ylabel('y [m]')
+zlabel('z [m/s]')
 
 fprintf('\n------------------End------------------\n');

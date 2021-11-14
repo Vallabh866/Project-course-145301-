@@ -7,7 +7,7 @@ child_waypoint = 2;
 %child_wayline = wayline_num_last_node_max;
 
 parent_wayline = parent_matrix{child_waypoint, child_wayline}{1,1}(1,2);
-celldisp(parent_matrix);
+%celldisp(parent_matrix);
 parent_waypoint = parent_matrix{child_waypoint, child_wayline}{1,1}(1,1);
 parent_temp = [waypoints{parent_waypoint, parent_wayline}{1,1}(1,1), waypoints{parent_waypoint, parent_wayline}{1,1}(1,2)];
 
@@ -17,11 +17,11 @@ while(1)
     %Single spline out of all the list of splines constituting the final
     %path
     CL_final_result.build_G1(parent_temp(1), parent_temp(2), headings(1, parent_wayline),child_temp(1), child_temp(2), headings(1, child_wayline));
+    CL_final_result.plot;
     
     %Single spline made out of all the splines constituting the final
     %path
-    CL_final_result_combined.push_back_G1(parent_temp(1), parent_temp(2), headings(1, parent_wayline),child_temp(1), child_temp(2), headings(1, child_wayline));
-    CL_final_result.plot;
+    CL_final_result_combined.push_back_G1(parent_temp(1), parent_temp(2), headings(1, parent_wayline),child_temp(1), child_temp(2), headings(1, child_wayline));    
     
     CL_final_path_length=[CL_final_path_length CL_final_result.length];
     CL_final_path_curv = [CL_final_path_curv CL_final_result.kappa(CL_final_result.length)];
@@ -44,9 +44,12 @@ while(1)
     if(parent_wayline == 1)
         CL_final_result.build_G1(parent_temp(1), parent_temp(2), headings(1, parent_wayline),child_temp(1), child_temp(2), headings(1, child_wayline));
         CL_final_result.plot;
+        
+        CL_final_result_combined.push_back_G1(parent_temp(1), parent_temp(2), headings(1, parent_wayline),child_temp(1), child_temp(2), headings(1, child_wayline));
         break;
     end
 end
+%CL_final_result_combined.plot;
 
 %%% If one wants to plot all the generated waypoints by the
 %%% "define_waypoints" function

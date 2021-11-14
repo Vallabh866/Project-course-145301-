@@ -1,4 +1,4 @@
-function [cost, v_ini_clothoid] = cost_FWBW(CL_s, CL_k_ini,CL_k_fin, v_ini_clothoid)
+function [cost, v_ini_clothoid, tim_vect, speed_profile, curv_absc_vect] = cost_FWBW(CL_s, CL_k_ini,CL_k_fin, v_ini_clothoid)
 
 set(0,'DefaultFigureWindowStyle','docked');
 set(0,'defaultAxesFontSize',20)
