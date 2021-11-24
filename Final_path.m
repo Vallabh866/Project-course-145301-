@@ -24,7 +24,8 @@ while(1)
     CL_final_result_combined.push_back_G1(parent_temp(1), parent_temp(2), headings(1, parent_wayline),child_temp(1), child_temp(2), headings(1, child_wayline));    
     
     CL_final_path_length=[CL_final_path_length CL_final_result.length];
-    CL_final_path_curv = [CL_final_path_curv CL_final_result.kappa(CL_final_result.length)];
+    %CL_final_path_curv = [CL_final_path_curv CL_final_result.kappa(CL_final_result.length)];
+    CL_final_path_curv = [CL_final_path_curv CL_final_result.kappa(0)];
     
     child_temp = parent_temp;
     child_wayline = parent_wayline;

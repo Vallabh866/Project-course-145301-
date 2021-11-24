@@ -11,7 +11,7 @@ close all
 t_track_creation_start = tic;
 
 % Perform all Parameter initializations along with track paramaters definition
-run(strcat(project_folder,'\param_init.m'));
+param_init;
 
 t_track_creation_end = toc(t_track_creation_start);
 fprintf("\nIt took %d seconds for the Track to be created along with the waylines\n", t_track_creation_end);
@@ -29,11 +29,11 @@ t_RRT_star_exploration_start = tic;
         end
     end 
     % Condition 2 : Check if a given percentage of the whole track is explored
-        if (final_saturation_condition_counter >= 1)
-           if sum(exploration_matrix,'all') >= (exploration_saturation_percentage)*(sum((ones(size(waypoints))),'all'))
-                break; % Stop the RRT* exploration
-           end
-        end   
+    if (final_saturation_condition_counter >= 1)
+        if sum(exploration_matrix,'all') >= (exploration_saturation_percentage)*(sum((ones(size(waypoints))),'all'))
+           break; % Stop the RRT* exploration
+        end
+    end   
      
     % Store the farthest wayline that the algorithm has reached
     if(wayline_num_last_node>wayline_num_last_node_max)
@@ -51,17 +51,12 @@ t_RRT_star_exploration_start = tic;
     min_cost = 10000;
     
     % Perform forward exploration to find the most suitable parent based on the FW-BW cost
-    run(strcat(project_folder,'\Forward_exploration.m'));
+    Forward_exploration;
     CL_min_cost_parent.plot(npts,'Color','red');
 
     % Perform Rewiring to refine the planned path
-   run(strcat(project_folder,'\Rewiring.m'));
-   
- end
- 
- % Plot the time consumption graphs for different sections of the algorithm
- % run(strcat(project_folder,'\Time_cosumption.m'));
- 
+   Rewiring;
+ end 
  t_RRT_star_exploration_end = toc(t_RRT_star_exploration_start);
  
  fprintf("\nIt took %d seconds for the RRT* exploration\n", t_RRT_star_exploration_end);
@@ -75,7 +70,7 @@ edge_left.plot;
 edge_right.plot;
 
 %Plot the final optimal path found after the exploration and rewiring
-run(strcat(project_folder,'\Final_path.m'));
+Final_path;
 
 t_final_path_plot_end = toc(t_final_path_plot_start);
 
@@ -88,14 +83,17 @@ fprintf("\nIt took %d seconds for plotting the final plot\n", t_final_path_plot_
 x_final_path_vect=[];
 y_final_path_vect=[];
 [~,final_path_curv_absc_vect_size]=size(final_path_curv_absc_vect);
-for i = 1:final_path_curv_absc_vect_size
-    [x_final_path, y_final_path] = CL_final_result_combined.evaluate(final_path_curv_absc_vect(i));
-    x_final_path_vect = [x_final_path_vect x_final_path];
-    y_final_path_vect = [y_final_path_vect y_final_path];
-    %plot3(x_final_path, y_final_path, speed_profile_final_path(i));    
-end
+path_discretizn_step_size = CL_final_result_combined.length()/final_path_curv_absc_vect_size;
 
-%disp([x_final_path, y_final_path]);
+%for i = 1:final_path_curv_absc_vect_size 
+%for i = 1:0.1:CL_final_result_combined.length()
+for i = 1:path_discretizn_step_size:CL_final_result_combined.length()
+    if(i <=final_path_curv_absc_vect_size)
+        [x_final_path, y_final_path] = CL_final_result_combined.evaluate(i);
+        x_final_path_vect = [x_final_path_vect x_final_path];
+        y_final_path_vect = [y_final_path_vect y_final_path];
+    end
+end
 
 figure('Name','Speed Profile','NumberTitle','off'), clf
 hold on
@@ -106,8 +104,11 @@ xlabel('t[0.01s]')
 ylabel('v(m/s)')
 
 figure('Name','Speed Profile over the track','NumberTitle','off'), clf
-%CL_final_result_combined.plot();
-plot3(x_final_path_vect, y_final_path_vect, speed_profile_final_path, 'x');
+[~,x_final_path_vect_size]=size(x_final_path_vect);
+for i=1:1:x_final_path_vect_size
+    plot3(x_final_path_vect(i),y_final_path_vect(i),speed_profile_final_path(i),'x')
+hold on
+end
 grid on
 xlabel('x [m]')
 ylabel('y [m]')
