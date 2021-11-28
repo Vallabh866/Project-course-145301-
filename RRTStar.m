@@ -41,7 +41,8 @@ t_RRT_star_exploration_start = tic;
     end
     
     % Generate a random waypoint q_rand which RRT* will explore next
-    run(strcat(project_folder,'\rand_waypoint_generator.m'));
+    %run(strcat(project_folder,'\rand_waypoint_generator.m'));
+    rand_waypoint_generator;
     plot(q_rand(1), q_rand(2), 'x', 'Color',  [0 0.4470 0.7410]);
     
     % Pick the closest node from existing list to branch out from
@@ -50,8 +51,8 @@ t_RRT_star_exploration_start = tic;
     qrand_curvature = curvatures(1, rand_wayline);
     min_cost = 10000;
     
-    % Perform forward exploration to find the most suitable parent based on the FW-BW cost
-    Forward_exploration;
+    % Perform exploration to find the most suitable parent based on the FW-BW cost
+    Parent_exploration;
     CL_min_cost_parent.plot(npts,'Color','red');
 
     % Perform Rewiring to refine the planned path
@@ -76,42 +77,6 @@ t_final_path_plot_end = toc(t_final_path_plot_start);
 
 fprintf("\nIt took %d seconds for plotting the final plot\n", t_final_path_plot_end);
 
-[cost_final_path, v_ini_clothoid_final_path, time_vect_final_path, speed_profile_final_path, final_path_curv_absc_vect] = ...
-    cost_FWBW(CL_final_path_length, CL_final_path_curv(1, 1:(end-1)),CL_final_path_curv(1, end),v_ini_clothoid_matrix(2,1));
-
-%Plot the velocity values along the track
-x_final_path_vect=[];
-y_final_path_vect=[];
-[~,final_path_curv_absc_vect_size]=size(final_path_curv_absc_vect);
-path_discretizn_step_size = CL_final_result_combined.length()/final_path_curv_absc_vect_size;
-
-%for i = 1:final_path_curv_absc_vect_size 
-%for i = 1:0.1:CL_final_result_combined.length()
-for i = 1:path_discretizn_step_size:CL_final_result_combined.length()
-    if(i <=final_path_curv_absc_vect_size)
-        [x_final_path, y_final_path] = CL_final_result_combined.evaluate(i);
-        x_final_path_vect = [x_final_path_vect x_final_path];
-        y_final_path_vect = [y_final_path_vect y_final_path];
-    end
-end
-
-figure('Name','Speed Profile','NumberTitle','off'), clf
-hold on
-axis equal
-plot(time_vect_final_path,  speed_profile_final_path, 'x');
-grid on
-xlabel('t[0.01s]')
-ylabel('v(m/s)')
-
-figure('Name','Speed Profile over the track','NumberTitle','off'), clf
-[~,x_final_path_vect_size]=size(x_final_path_vect);
-for i=1:1:x_final_path_vect_size
-    plot3(x_final_path_vect(i),y_final_path_vect(i),speed_profile_final_path(i),'x')
-hold on
-end
-grid on
-xlabel('x [m]')
-ylabel('y [m]')
-zlabel('z [m/s]')
+Speed_profile_plot;
 
 fprintf('\n------------------End------------------\n');

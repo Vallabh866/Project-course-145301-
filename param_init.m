@@ -1,10 +1,6 @@
-%function [waypoints_per_wayline,waylines_count] = param_init()
-
 fprintf("\n-----------------------------\n");
 Selection = '\nPlease select one option:\n1. Full track exploration\n2. Single corner exploration\n';
 Exploration_option = input(Selection);
-%fprintf("\n1. Full track exploration\n");
-%fprintf("\n2. Single corner exploration\n");
 fprintf("\n-----------------------------\n");
 
 % Array to store the velocity profile of the final path
@@ -27,7 +23,7 @@ Center_line = create_RoadFile();
 
 if(Exploration_option==2)
     %Center_line = Center_line*0.1;
-    % This condition is specifically for Pista azzura, Change the min and
+    % This condition is specifically for Pista Azzura, Change the min and
     % max value of trim based on the track and the location on the track you wish to
     % explore
     s_min = 0;
